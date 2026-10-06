@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="si"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Online Paper</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1a1d21;--mut:#6b7280;--pri:#1d4ed8;--ok:#15803d;--bd:#d9dde3}
+@media(prefers-color-scheme:dark){:root{--bg:#14171b;--card:#1e2227;--tx:#e8eaed;--mut:#9aa3ad;--pri:#6b9bff;--ok:#4ade80;--bd:#333a42}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,"Noto Sans Sinhala",sans-serif}
+.w{max-width:760px;margin:0 auto;padding:12px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:12px}
+input,button{font:inherit;border-radius:10px;border:1px solid var(--bd);padding:10px 12px;background:var(--card);color:var(--tx)}
+input{width:100%;margin:6px 0 12px}button{cursor:pointer}button.p{background:var(--pri);color:#fff;border-color:var(--pri)}
+.bar{display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:2}
+#t{font-weight:700;font-variant-numeric:tabular-nums}
+.q img{width:100%;height:auto;background:#fff;border-radius:8px}
+.o{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.o button{padding:14px 0;font-size:20px;font-weight:600}.o button.s{background:var(--pri);color:#fff;border-color:var(--pri)}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:6px}
+.g button{padding:8px 0;font-size:14px}.g .d{background:var(--ok);color:#fff;border-color:var(--ok)}.g .n{outline:2px solid var(--pri)}
+.r{display:flex;justify-content:space-between;gap:8px}.m{color:var(--mut);font-size:14px}
+</style></head><body><div class="w" id="app"></div>
+<script>
+const API="PASTE_APPS_SCRIPT_URL_HERE";   // Apps Script Web App URL (…/exec)
+const ID=new URLSearchParams(location.search).get('paper')||'';
+const $=s=>document.querySelector(s),app=$('#app'),pad=n=>String(n).padStart(2,'0');
+let P,S;
+const api=async o=>(await fetch(API+'?'+new URLSearchParams({paper:ID,...o}))).json();
+const K=()=>'p_'+ID+'_'+S.idx;
+const sv=()=>{try{localStorage.setItem(K(),JSON.stringify(S))}catch(e){}};
+const ld=()=>{try{return JSON.parse(localStorage.getItem(K()))}catch(e){return null}};
+const msg=t=>app.innerHTML=`<div class="c"><p>${t}</p></div>`;
+async function init(){
+  if(!ID)return msg("Paper link එක වැරදියි.");
+  try{P=await api({action:'info'})}catch(e){return msg("Internet ගැටලුවක්. නැවත උත්සාහ කරන්න.")}
+  if(P.err)return msg("Paper එක හමු නොවීය.");
+  login();
+}
+function login(m=''){
+  app.innerHTML=`<div class="c"><h2>${P.title}</h2><p class="m">ප්‍රශ්න ${P.total} · විනාඩි ${P.minutes} · එක් වරක් පමණයි</p>
+  <label>Index අංකය</label><input id="ix" inputmode="numeric" autocomplete="off"><p style="color:#dc2626">${m}</p><button class="p" id="go">ආරම්භ කරන්න</button></div>`;
+  $('#go').onclick=start;
+}
+async function start(){
+  const ix=$('#ix').value.trim(),n=Date.now();
+  if(!ix)return login('Index අංකය ඇතුළත් කරන්න');
+  S={idx:ix};const old=ld();
+  if(!old){if(P.open&&n<P.open)return login('Paper එක තවම විවෘත වී නැත');if(P.close&&n>P.close)return login('Paper එක වසා ඇත')}
+  $('#go').disabled=true;let r;
+  try{r=await api({action:'check',index:ix})}catch(e){return login('Internet ගැටලුවක්, නැවත උත්සාහ කරන්න')}
+  if(r.err)return login('Index අංකය හමු නොවීය');
+  if(r.done)return login('මෙම paper එක දැනටමත් ඉදිරිපත් කර ඇත');
+  S=old||{idx:ix,name:r.name,a:Array(P.total).fill(0),i:0,end:n+P.minutes*60000};
+  sv();show();tick();window.tm=setInterval(tick,1000);
+}
+function tick(){
+  const l=Math.max(0,Math.round((S.end-Date.now())/1000)),t=$('#t');
+  if(t)t.textContent=pad(Math.floor(l/60))+":"+pad(l%60);
+  if(l<=0){clearInterval(window.tm);submit(true)}
+}
+function show(){
+  const i=S.i,n=P.total,d=S.a.filter(Boolean).length;
+  app.innerHTML=`<div class="bar"><span>${S.name} · ${S.idx}</span><span id="t"></span></div>
+  <div class="c q"><div class="m">ප්‍රශ්නය ${i+1} / ${n} · පිළිතුරු දුන්නේ ${d}</div>
+  <img src="papers/${ID}/q${pad(i+1)}.jpg" alt="Q${i+1}">
+  <div class="o">${[1,2,3,4].map(k=>`<button data-k="${k}" class="${S.a[i]==k?'s':''}">${k}</button>`).join("")}</div>
+  <div class="r"><button id="pv" ${i?'':'disabled'}>← කලින්</button><button id="cl">මකන්න</button><button id="nx" ${i<n-1?'':'disabled'}>ඊළඟ →</button></div></div>
+  <div class="c"><div class="g">${S.a.map((v,j)=>`<button data-j="${j}" class="${v?'d':''} ${j==i?'n':''}">${j+1}</button>`).join("")}</div>
+  <p><button class="p" id="sb">Paper එක ඉදිරිපත් කරන්න</button></p></div>`;
+  const re=()=>{sv();show();tick()};
+  document.querySelectorAll('.o button').forEach(b=>b.onclick=()=>{S.a[i]=S.a[i]==b.dataset.k?0:+b.dataset.k;re()});
+  document.querySelectorAll('.g button').forEach(b=>b.onclick=()=>{S.i=+b.dataset.j;re()});
+  $('#pv').onclick=()=>{S.i--;re()};$('#nx').onclick=()=>{S.i++;re()};$('#cl').onclick=()=>{S.a[i]=0;re()};
+  $('#sb').onclick=()=>{const b=S.a.filter(x=>!x).length;if(confirm(b?`පිළිතුරු නොදුන් ප්‍රශ්න ${b}ක් ඇත. ඉදිරිපත් කරන්නද?`:"ඉදිරිපත් කරන්නද?"))submit()};
+}
+async function submit(auto){
+  clearInterval(window.tm);msg("යවමින්...");
+  try{
+    const r=await api({action:'submit',index:S.idx,ans:S.a.join('')});
+    if(r.err&&r.err!='dup')throw 0;
+    try{localStorage.removeItem(K())}catch(e){}
+    app.innerHTML=`<div class="c"><h2>${auto?'කාලය අවසන්!':'ඉදිරිපත් කළා ✅'}</h2><p>ඔබේ පිළිතුරු සුරැකුණා.</p>${r.score!=null?`<p style="font-size:28px;font-weight:700">${r.score} / ${r.total}</p>`:''}</div>`;
+  }catch(e){
+    app.innerHTML=`<div class="c"><p style="color:#dc2626">⚠️ යැවීම අසාර්ථකයි. Internet බලා නැවත උත්සාහ කරන්න. (පිළිතුරු සුරැකී ඇත)</p><button class="p" id="rt">නැවත යවන්න</button></div>`;
+    $('#rt').onclick=()=>submit(auto);
+  }
+}
+init();
+</script></body></html>
